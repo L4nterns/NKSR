@@ -14,7 +14,6 @@ from typing import Dict, Tuple, List, Union, Optional
 from nksr.ext import _CpuIndexGrid, _CudaIndexGrid
 from nksr.utils import get_device, Device
 from enum import Enum
-from pycg import vis
 from pycg.isometry import Isometry
 
 
@@ -134,6 +133,11 @@ class SparseIndexGrid:
 
     def sample_trilinear(self, points: torch.tensor, grid_data: torch.tensor,
                          return_grad: bool = False) -> Union[torch.tensor, Tuple[torch.tensor, torch.tensor]]:
+        if points.size(0) == 0:
+            values = grid_data.new_zeros((0, *grid_data.shape[1:]))
+            if return_grad:
+                return values, grid_data.new_zeros((*values.shape, 3))
+            return values
         return self._grid.sample_trilinear(points, grid_data, return_grad)
 
     def sample_bezier(self, points: torch.tensor, grid_data: torch.tensor,
@@ -298,6 +302,8 @@ class SparseFeatureHierarchy:
         return query_pos, primal_coords
 
     def get_visualization(self):
+        from pycg import vis
+
         wire_blocks = []
         for d in range(self.depth):
             if self.grids[d] is None:

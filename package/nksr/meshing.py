@@ -15,6 +15,11 @@ class MarchingCubes(torch.autograd.Function):
     @staticmethod
     def forward(ctx, cube_corner_inds, corner_pos, corner_value):
         # v: (V, 3) float | f: (T, 3) long | vidx: (V, 2) long
+        if cube_corner_inds.numel() == 0:
+            vertices = corner_pos.new_empty((0, 3))
+            faces = cube_corner_inds.new_empty((0, 3))
+            ctx.save_for_backward(corner_pos, corner_value, cube_corner_inds.new_empty((0, 2)))
+            return vertices, faces
         assert torch.max(cube_corner_inds) < corner_pos.size(0) == corner_value.size(0)
         v, f, vidx = meshing.marching_cubes(cube_corner_inds, corner_pos, corner_value)
         ctx.save_for_backward(corner_pos, corner_value, vidx)

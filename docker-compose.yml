@@ -1,0 +1,93 @@
+name: nksr
+
+x-nksr-env: &nksr-env
+  DEVICE: ${DEVICE:-cuda:0}
+  PYTORCH_CUDA_ALLOC_CONF: ${PYTORCH_CUDA_ALLOC_CONF:-expandable_segments:True}
+  NKSR_CONFIG: ${NKSR_CONFIG:-snet-wonormal}
+  NKSR_CHECKPOINTS_DIR: /workspace/checkpoints
+  NKSR_INPUT_MODE: ${NKSR_INPUT_MODE:-auto}
+  NKSR_XYZ_COLS: ${NKSR_XYZ_COLS:-x,y,z}
+  NKSR_NORMAL_COLS: ${NKSR_NORMAL_COLS:-normal_x,normal_y,normal_z}
+  NKSR_SENSOR_COLS: ${NKSR_SENSOR_COLS:-sensor_x,sensor_y,sensor_z}
+  NKSR_COLOR_COLS: ${NKSR_COLOR_COLS:-red,green,blue}
+  NKSR_OBB_LOCK_AXIS: ${NKSR_OBB_LOCK_AXIS:-z}
+  NKSR_OUTPUT_UP_AXIS: ${NKSR_OUTPUT_UP_AXIS:-y}
+  NKSR_WRITE_STATS: ${NKSR_WRITE_STATS:-true}
+  NKSR_SIMPLIFY_METHOD: ${NKSR_SIMPLIFY_METHOD:-none}
+  NKSR_FACE_RATIO: ${NKSR_FACE_RATIO:-1.0}
+  NKSR_DETAIL_LEVEL: ${NKSR_DETAIL_LEVEL:-1}
+  NKSR_VOXEL_SIZE: ${NKSR_VOXEL_SIZE:-}
+  NKSR_MAX_CHUNK_POINTS: ${NKSR_MAX_CHUNK_POINTS:-750000}
+  NKSR_MAX_CHUNK_EXTENT: ${NKSR_MAX_CHUNK_EXTENT:-}
+  NKSR_MAX_CHUNK_INPUT_EXTENT: ${NKSR_MAX_CHUNK_INPUT_EXTENT:-}
+  NKSR_CHUNK_OVERLAP_RATIO: ${NKSR_CHUNK_OVERLAP_RATIO:-0.05}
+  NKSR_CHUNK_TMP_DEVICE: ${NKSR_CHUNK_TMP_DEVICE:-cpu}
+  NKSR_MAX_INPUT_EXTENT: ${NKSR_MAX_INPUT_EXTENT:-200.0}
+  NKSR_OUTLIER_QUANTILE: ${NKSR_OUTLIER_QUANTILE:-0.0}
+  NKSR_MIN_FILTERED_POINTS: ${NKSR_MIN_FILTERED_POINTS:-1000}
+  NKSR_ESTIMATE_KNN: ${NKSR_ESTIMATE_KNN:-64}
+  NKSR_ESTIMATE_ORIENT: ${NKSR_ESTIMATE_ORIENT:-centroid}
+  NKSR_DROP_THRESHOLD_DEG: ${NKSR_DROP_THRESHOLD_DEG:-85.0}
+  NKSR_MISE_ITER: ${NKSR_MISE_ITER:-1}
+  NKSR_GRID_UPSAMPLE: ${NKSR_GRID_UPSAMPLE:-1}
+  NKSR_EXTRACT_ON_CPU: ${NKSR_EXTRACT_ON_CPU:-false}
+  NKSR_TEXTURE_MODE: ${NKSR_TEXTURE_MODE:-auto}
+  NKSR_APPROX_KERNEL_GRAD: ${NKSR_APPROX_KERNEL_GRAD:-false}
+  NKSR_SOLVER_MAX_ITER: ${NKSR_SOLVER_MAX_ITER:-2000}
+  NKSR_SOLVER_TOL: ${NKSR_SOLVER_TOL:-1.0e-5}
+  NKSR_NYSTROM_MIN_DEPTH: ${NKSR_NYSTROM_MIN_DEPTH:-100}
+  NKSR_RECONSTRUCT_ATTEMPTS: ${NKSR_RECONSTRUCT_ATTEMPTS:-3}
+  NKSR_FUSED_MODE: ${NKSR_FUSED_MODE:-true}
+  HTTP_HOST: ${HTTP_HOST:-0.0.0.0}
+  HTTP_PORT: ${HTTP_PORT:-8012}
+  HTTP_AUTH_TOKEN: ${HTTP_AUTH_TOKEN:-}
+
+x-nksr: &nksr
+  image: nksr-http:cu124
+  build:
+    context: .
+    dockerfile: docker/Dockerfile
+    args:
+      BASE_IMAGE: ${BASE_IMAGE:-nvidia/cuda:12.4.1-devel-ubuntu22.04}
+      APT_MIRROR: ${APT_MIRROR:-mirrors.tuna.tsinghua.edu.cn}
+      PIP_INDEX_URL: ${PIP_INDEX_URL:-https://mirrors.aliyun.com/pypi/simple}
+      PIP_TRUSTED_HOST: ${PIP_TRUSTED_HOST:-mirrors.aliyun.com}
+      UV_INSTALL_URL: ${UV_INSTALL_URL:-https://astral.sh/uv/install.sh}
+      TORCH_CUDA_ARCH_LIST: ${TORCH_CUDA_ARCH_LIST:-8.6}
+      MAX_JOBS: ${MAX_JOBS:-4}
+  working_dir: /workspace/nksr
+  ipc: host
+  gpus: all
+  environment: *nksr-env
+  volumes:
+    - ${NKSR_CHECKPOINTS_DIR:-./checkpoints}:/workspace/checkpoints:ro
+
+services:
+  nksr-http:
+    <<: *nksr
+    restart: unless-stopped
+    ports:
+      - "${HTTP_PORT:-8012}:${HTTP_PORT:-8012}"
+    command:
+      - uv
+      - run
+      - --group
+      - http
+      - python
+      - scripts/http_infer_pcd.py
+      - --host
+      - ${HTTP_HOST:-0.0.0.0}
+      - --port
+      - ${HTTP_PORT:-8012}
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:${HTTP_PORT:-8012}/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  shell:
+    <<: *nksr
+    profiles:
+      - tools
+    command: /bin/bash

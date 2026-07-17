@@ -1,0 +1,37 @@
+[project]
+name = "nksr-inference-fork"
+version = "0.1.0"
+description = "Runtime environment for the NKSR point cloud inference fork."
+requires-python = ">=3.10,<3.11"
+dependencies = [
+    "torch==2.6.0+cu124",
+    "torchvision==0.21.0+cu124",
+    "python-pycg>=1.0.1",
+    "pykdtree",
+    "numpy",
+    "matplotlib",
+    "open3d",
+    "ninja",
+    "GitPython",
+    "pyntcloud",
+    "plyfile",
+]
+
+[dependency-groups]
+http = [
+    "fastapi",
+    "python-multipart",
+    "uvicorn[standard]",
+]
+
+[tool.uv]
+package = false
+
+[[tool.uv.index]]
+name = "pytorch-cu124"
+url = "https://download.pytorch.org/whl/cu124"
+explicit = true
+
+[tool.uv.sources]
+torch = { index = "pytorch-cu124" }
+torchvision = { index = "pytorch-cu124" }

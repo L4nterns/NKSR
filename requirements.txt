@@ -1,14 +1,14 @@
---extra-index-url https://download.pytorch.org/whl/cu128
-torch==2.7.0+cu128
-torchvision
-
--f https://data.pyg.org/whl/torch-2.8.0+cu128.html
-torch-scatter
+# Compatibility fallback for pip. Prefer `uv sync --locked` from pyproject.toml.
+--extra-index-url https://download.pytorch.org/whl/cu124
+torch==2.6.0+cu124
+torchvision==0.21.0+cu124
 
 python-pycg>=1.0.1
+pykdtree
 
 numpy
 matplotlib
+open3d
 
 ninja
 GitPython

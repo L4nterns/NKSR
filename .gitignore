@@ -174,3 +174,5 @@ assets/scannet.ply
 assets/las/
 
 package/external/
+
+.history/

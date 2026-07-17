@@ -20,7 +20,7 @@ from nksr.nn.encdec import PointEncoder, MultiscalePointDecoder
 from nksr.interpolator import MLPFeatureInterpolator
 from nksr.svh import SparseFeatureHierarchy
 from nksr.fields import KernelField, NeuralField, FusedField, LayerField
-from nksr.utils import split_into_chunks, get_device, Device
+from nksr.utils import split_into_chunks, get_device, Device, estimate_normals
 
 __version__ = '1.0.3'
 __version_info__ = (1, 0, 3)
@@ -111,7 +111,7 @@ def get_estimate_normal_preprocess_fn(knn: int, drop_threshold_degrees: float = 
         if knn > xyz.size(0):
             return None
 
-        normal, sub_indices = utils.estimate_normals(
+        normal, sub_indices = estimate_normals(
             xyz, sensor,
             knn=knn, drop_threshold_degrees=drop_threshold_degrees
         )

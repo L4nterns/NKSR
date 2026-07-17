@@ -61,9 +61,10 @@ class FusedField(BaseField):
 
         for (field, transform, (bound_min, bound_max)) in zip(self.fields, self.transforms, self.bounds):
             local_xyz = transform.inv() @ xyz
+            eps = torch.finfo(local_xyz.dtype).eps * 16
             valid_inds = torch.logical_and(
-                torch.all(local_xyz > bound_min[None, :], dim=1),
-                torch.all(local_xyz < bound_max[None, :], dim=1))
+                torch.all(local_xyz >= (bound_min[None, :] - eps), dim=1),
+                torch.all(local_xyz <= (bound_max[None, :] + eps), dim=1))
             valid_inds = torch.where(valid_inds)[0]
             if valid_inds.size(0) == 0:
                 continue
@@ -79,6 +80,8 @@ class FusedField(BaseField):
                 mask_list.append(mask_value - field.mask_field.level_set * 4.0)
 
         # Aggregation
+        if not index_list:
+            return EvaluationResult(torch.zeros(xyz.size(0), dtype=xyz.dtype, device=xyz.device))
         index_list = torch.cat(index_list)
         f_list = torch.cat([f.value for f in f_list])
 

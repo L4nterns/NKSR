@@ -8,10 +8,13 @@
 
 
 import copy
+import os
+from pathlib import Path
+from typing import Mapping, Union
+from urllib.parse import unquote, urlparse
 
 import torch.hub
 from omegaconf import DictConfig, OmegaConf
-from typing import Union, Mapping
 
 
 __configs__ = {
@@ -78,7 +81,21 @@ def get_hparams(config: Union[str, Mapping]):
     return hparams
 
 
+def local_checkpoint_path(url: str):
+    checkpoint_dir = os.environ.get("NKSR_CHECKPOINTS_DIR", "").strip()
+    if not checkpoint_dir or not url.startswith("http"):
+        return None
+    filename = Path(unquote(urlparse(url).path)).name
+    return Path(checkpoint_dir).expanduser() / filename
+
+
 def load_checkpoint_from_url(url: str):
+    local_path = local_checkpoint_path(url)
+    if local_path is not None:
+        if not local_path.is_file():
+            raise FileNotFoundError(f"NKSR checkpoint not found: {local_path}")
+        url = str(local_path)
+
     if url.startswith("http"):
         return torch.hub.load_state_dict_from_url(url)
     elif url.startswith("gdrive"):

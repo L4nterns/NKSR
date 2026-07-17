@@ -100,6 +100,9 @@ class BaseField(ABC):
         pass
 
     def evaluate_f_bar(self, xyz: torch.Tensor, max_points: int = -1, verbose: bool = True):
+        if xyz.size(0) == 0:
+            return xyz.new_empty((0,))
+
         n_chunks = int(np.ceil(xyz.size(0) / max_points)) if max_points > 0 else 1
         xyz_chunks = torch.chunk(xyz, n_chunks)
         f_bar_chunks = []
@@ -169,10 +172,13 @@ class BaseField(ABC):
             flattened_grids.append(f_grid)
         dual_grid = meshing.build_joint_dual_grid(flattened_grids)
         dmc_graph = meshing.dual_cube_graph(flattened_grids, dual_grid)
-        dmc_vertices = torch.cat([
+        vertex_layers = [
             f_grid.grid_to_world(f_grid.active_grid_coords().float())
             for f_grid in flattened_grids if f_grid.num_voxels() > 0
-        ], dim=0)
+        ]
+        if not vertex_layers or dmc_graph.size(0) == 0:
+            return self._empty_mesh()
+        dmc_vertices = torch.cat(vertex_layers, dim=0)
         del flattened_grids, dual_grid
 
         if self.scale != 1.0:
@@ -184,11 +190,16 @@ class BaseField(ABC):
             cube_sign = dmc_value[dmc_graph] > 0
             cube_mask = ~torch.logical_or(torch.all(cube_sign, dim=1), torch.all(~cube_sign, dim=1))
             dmc_graph = dmc_graph[cube_mask]
+            if dmc_graph.size(0) == 0:
+                return self._empty_mesh()
             unq, dmc_graph = torch.unique(dmc_graph.view(-1), return_inverse=True)
             dmc_graph = dmc_graph.view(-1, 8)
             dmc_vertices = dmc_vertices[unq]
             dmc_graph, dmc_vertices = utils.subdivide_cube_indices(dmc_graph, dmc_vertices)
             dmc_value = self.evaluate_f_bar(dmc_vertices, max_points=max_points)
+
+        if dmc_graph.size(0) == 0:
+            return self._empty_mesh()
 
         dual_v, dual_f = MarchingCubes().apply(dmc_graph, dmc_vertices, dmc_value)
 
@@ -202,3 +213,8 @@ class BaseField(ABC):
             dual_c = None
 
         return MeshingResult(dual_v, dual_f, dual_c)
+
+    def _empty_mesh(self) -> MeshingResult:
+        vertices = torch.empty((0, 3), dtype=torch.float32, device=self.device)
+        faces = torch.empty((0, 3), dtype=torch.long, device=self.device)
+        return MeshingResult(vertices, faces, None)
